@@ -46,6 +46,33 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
+    def add_partner(self, partner_data):
+        conn = self.get_connection()
+        cursor = conn.cursor()
+
+        query = """
+        INSERT INTO Partners_Import 
+        (PartnerType, PartnerName, Director, Phone, Email, LegalAddress, INN, Rating)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+
+        values = (
+            partner_data['PartnerType'],
+            partner_data['PartnerName'],
+            partner_data['Director'],
+            partner_data['Phone'],
+            partner_data['Email'],
+            partner_data['LegalAddress'],
+            partner_data['INN'],
+            partner_data['Rating']
+        )
+
+        cursor.execute(query, values)
+        conn.commit()
+        conn.close()
+
+        return cursor.rowcount > 0
+
     def get_all_partners(self):
         conn = self.get_connection()
         cursor = conn.cursor()

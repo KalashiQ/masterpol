@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
                              QHeaderView)
 from PyQt5.QtCore import Qt
 from database.db_manager import DatabaseManager
+from ui.add_partner_screen import AddPartnerScreen
 
 
 class PartnersScreen(QWidget):
@@ -108,7 +109,11 @@ class PartnersScreen(QWidget):
                 QMessageBox.critical(self, "Ошибка", f"Ошибка при удалении: {str(e)}")
 
     def add_partner(self):
-        QMessageBox.information(self, "Информация", "Экран добавления партнера будет реализован позже")
+        self.add_partner_window = AddPartnerScreen()
+        self.add_partner_window.partner_added.connect(self.load_partners)
+        self.add_partner_window.setWindowTitle("Добавление партнера")
+        self.add_partner_window.setFixedSize(800, 600)
+        self.add_partner_window.show()
 
     def edit_partner(self):
         if not self.get_selected_partner_inn():
