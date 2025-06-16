@@ -99,3 +99,53 @@ class DatabaseManager:
         conn.close()
 
         return cursor.rowcount > 0
+
+    def get_partner_by_inn(self, inn):
+        """Получает данные партнера по ИНН"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT PartnerType, PartnerName, Director, Phone, Email, 
+                       LegalAddress, INN, Rating 
+                FROM Partners_Import 
+                WHERE INN = ?
+            """, (inn,))
+
+            result = cursor.fetchone()
+            conn.close()
+            return result
+
+        except Exception as e:
+            print(f"Ошибка при получении партнера: {e}")
+            return None
+
+    def update_partner(self, inn, partner_data):
+        """Обновляет данные партнера"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE Partners_Import 
+                SET PartnerType = ?, PartnerName = ?, Director = ?, 
+                    Phone = ?, Email = ?, LegalAddress = ?, Rating = ?
+                WHERE INN = ?
+            """, (
+                partner_data['PartnerType'],
+                partner_data['PartnerName'],
+                partner_data['Director'],
+                partner_data['Phone'],
+                partner_data['Email'],
+                partner_data['LegalAddress'],
+                partner_data['Rating'],
+                inn
+            ))
+
+            conn.commit()
+            rowcount = cursor.rowcount
+            conn.close()
+            return rowcount > 0
+
+        except Exception as e:
+            print(f"Ошибка при обновлении партнера: {e}")
+            return False

@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
 from PyQt5.QtCore import Qt
 from database.db_manager import DatabaseManager
 from ui.add_partner_screen import AddPartnerScreen
+from ui.edit_partner_screen import EditPartnerScreen
 
 
 class PartnersScreen(QWidget):
@@ -116,10 +117,16 @@ class PartnersScreen(QWidget):
         self.add_partner_window.show()
 
     def edit_partner(self):
-        if not self.get_selected_partner_inn():
+        inn = self.get_selected_partner_inn()
+        if not inn:
             QMessageBox.warning(self, "Предупреждение", "Выберите партнера для редактирования")
             return
-        QMessageBox.information(self, "Информация", "Экран редактирования партнера будет реализован позже")
+
+        self.edit_partner_window = EditPartnerScreen(inn)
+        self.edit_partner_window.partner_updated.connect(self.load_partners)
+        self.edit_partner_window.setWindowTitle("Редактирование партнера")
+        self.edit_partner_window.setFixedSize(800, 600)
+        self.edit_partner_window.show()
 
     def show_products(self):
         QMessageBox.information(self, "Информация", "Экран продукции будет реализован позже")
