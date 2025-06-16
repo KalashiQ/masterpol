@@ -5,6 +5,8 @@ from PyQt5.QtCore import Qt
 from database.db_manager import DatabaseManager
 from ui.add_partner_screen import AddPartnerScreen
 from ui.edit_partner_screen import EditPartnerScreen
+from ui.partner_products_screen import PartnerProductsScreen
+
 
 
 class PartnersScreen(QWidget):
@@ -129,7 +131,27 @@ class PartnersScreen(QWidget):
         self.edit_partner_window.show()
 
     def show_products(self):
-        QMessageBox.information(self, "Информация", "Экран продукции будет реализован позже")
+        """Показывает продукцию выбранного партнера"""
+        inn = self.get_selected_partner_inn()
+        if not inn:
+            QMessageBox.warning(self, "Предупреждение", "Выберите партнера для просмотра продукции")
+            return
+
+        try:
+            # Получаем название партнера для отображения в заголовке
+            partner_name = self.db_manager.get_partner_name_by_inn(inn)
+
+            # Импортируем и создаем окно продукции
+            from ui.partner_products_screen import PartnerProductsScreen
+
+            self.products_window = PartnerProductsScreen(inn, partner_name)
+            self.products_window.setWindowTitle(f"Продукция - {partner_name}")
+            self.products_window.setFixedSize(1000, 700)
+            self.products_window.show()
+
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось открыть экран продукции: {str(e)}")
+            print(f"Подробная ошибка: {e}")
 
     def show_history(self):
         QMessageBox.information(self, "Информация", "Экран истории продаж будет реализован позже")
