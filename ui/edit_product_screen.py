@@ -5,12 +5,14 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from database.db_manager import DatabaseManager
 
 
-class AddProductScreen(QWidget):
-    product_added = pyqtSignal()
+class EditProductScreen(QWidget):
+    product_updated = pyqtSignal()
 
-    def __init__(self, partner_inn=None):
+    def __init__(self, product_data, partner_inn=None):
         super().__init__()
-        self.partner_inn = partner_inn  # Сохраняем ИНН партнера
+        self.partner_inn = partner_inn
+        self.original_article = product_data['ArticleNumber']  # Сохраняем оригинальный артикул для поиска
+        self.product_data = product_data
         self.db_manager = DatabaseManager()
 
         # Словарь типов продукции: название -> ID
@@ -21,7 +23,11 @@ class AddProductScreen(QWidget):
             "Пробковое покрытие": "4"
         }
 
+        # Обратный словарь: ID -> название
+        self.id_to_type = {v: k for k, v in self.product_types.items()}
+
         self.init_ui()
+        self.load_product_data()
 
     def init_ui(self):
         main_layout = QVBoxLayout()
@@ -33,9 +39,9 @@ class AddProductScreen(QWidget):
         header_frame.setObjectName("headerFrame")
         header_layout = QHBoxLayout()
 
-        icon_label = QLabel("📦")
+        icon_label = QLabel("✏️")
         icon_label.setObjectName("iconLabel")
-        title_label = QLabel("Продукция")
+        title_label = QLabel("Редактирование продукции")
         title_label.setObjectName("headerTitle")
 
         header_layout.addWidget(icon_label)
@@ -50,11 +56,11 @@ class AddProductScreen(QWidget):
         content_frame.setObjectName("contentFrame")
         content_layout = QVBoxLayout()
 
-        form_title = QLabel("Продукция")
+        form_title = QLabel("Редактирование продукции")
         form_title.setObjectName("formTitle")
         content_layout.addWidget(form_title)
 
-        form_subtitle = QLabel("Добавление информации о продукции")
+        form_subtitle = QLabel("Изменение информации о продукции")
         form_subtitle.setObjectName("formSubtitle")
         content_layout.addWidget(form_subtitle)
 
@@ -70,9 +76,9 @@ class AddProductScreen(QWidget):
         self.product_name_edit.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         form_layout.addRow("Название продукции *", self.product_name_edit)
 
-        # Тип продукции - ComboBox вместо LineEdit
+        # Тип продукции - ComboBox
         self.product_type_combo = QComboBox()
-        self.product_type_combo.addItem("Выберите тип продукции", "")  # Пустой элемент по умолчанию
+        self.product_type_combo.addItem("Выберите тип продукции", "")
 
         # Добавляем типы продукции из словаря
         for type_name, type_id in self.product_types.items():
@@ -124,8 +130,45 @@ class AddProductScreen(QWidget):
         self.save_btn.clicked.connect(self.save_product)
         self.cancel_btn.clicked.connect(self.close)
 
+    def load_product_data(self):
+        """Загружает данные продукта в форму"""
+        try:
+            print("=== ЗАГРУЗКА ДАННЫХ ПРОДУКТА ===")
+            print("product_data:", self.product_data)
+
+            # Заполняем поля данными продукта
+            self.product_name_edit.setText(self.product_data.get('ProductName', ''))
+            self.article_edit.setText(self.product_data.get('ArticleNumber', ''))
+
+            # Устанавливаем тип продукции в ComboBox
+            product_type_id = str(self.product_data.get('ProductTypeID', ''))
+            print("Ищем тип с ID:", product_type_id)
+
+            # Ищем нужный элемент в ComboBox по ID
+            for i in range(self.product_type_combo.count()):
+                if self.product_type_combo.itemData(i) == product_type_id:
+                    self.product_type_combo.setCurrentIndex(i)
+                    print(f"Установлен тип: {self.product_type_combo.itemText(i)}")
+                    break
+
+            # Устанавливаем цену
+            min_price = self.product_data.get('MinPartnerPrice', 0)
+            if isinstance(min_price, str):
+                try:
+                    min_price = float(min_price.replace(',', '.'))
+                except (ValueError, AttributeError):
+                    min_price = 0.0
+
+            self.price_spin.setValue(float(min_price))
+
+            print("=== ДАННЫЕ ЗАГРУЖЕНЫ ===")
+
+        except Exception as e:
+            print("Ошибка загрузки данных:", e)
+            QMessageBox.warning(self, "Ошибка", f"Ошибка при загрузке данных: {str(e)}")
+
     def save_product(self):
-        """Сохраняет новый продукт"""
+        """Сохраняет изменения в продукте"""
         if not self.validate_fields():
             return
 
@@ -133,29 +176,28 @@ class AddProductScreen(QWidget):
             # Получаем ID типа продукции из выбранного элемента ComboBox
             selected_type_id = self.product_type_combo.currentData()
 
-            product_data = {
+            updated_data = {
                 'ProductName': self.product_name_edit.text().strip(),
-                'ProductTypeID': selected_type_id,  # Используем ID из ComboBox
+                'ProductTypeID': selected_type_id,
                 'ArticleNumber': self.article_edit.text().strip(),
                 'MinPartnerPrice': self.price_spin.value()
             }
 
-            print("=== СОХРАНЕНИЕ ПРОДУКТА ===")
-            print("partner_inn:", self.partner_inn)
-            print("product_data:", product_data)
-            print("Выбранный тип:", self.product_type_combo.currentText())
-            print("ID типа:", selected_type_id)
+            print("=== СОХРАНЕНИЕ ИЗМЕНЕНИЙ ===")
+            print("original_article:", self.original_article)
+            print("updated_data:", updated_data)
 
-            # Используем метод add_product_with_partner_id
-            if self.db_manager.add_product_with_partner_id(product_data, self.partner_inn):
-                QMessageBox.information(self, "Успех", "Продукт успешно добавлен!")
-                self.product_added.emit()
+            # Используем метод update_product для обновления
+            if self.db_manager.update_product(self.original_article, updated_data):
+                QMessageBox.information(self, "Успех", "Продукт успешно обновлен!")
+                self.product_updated.emit()
                 self.close()
             else:
-                QMessageBox.warning(self, "Ошибка", "Не удалось добавить продукт")
+                QMessageBox.warning(self, "Ошибка", "Не удалось обновить продукт")
 
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", "Ошибка при сохранении: {}".format(str(e)))
+            print("Ошибка сохранения:", e)
+            QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении: {str(e)}")
 
     def validate_fields(self):
         """Валидация полей формы"""
