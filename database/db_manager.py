@@ -46,32 +46,81 @@ class DatabaseManager:
         conn.commit()
         conn.close()
 
+    def is_inn_exists(self, inn):
+        """Проверяет, существует ли партнер с таким ИНН"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT COUNT(*) FROM Partners_Import WHERE INN = ?", (inn,))
+            count = cursor.fetchone()[0]
+            conn.close()
+
+            return count > 0
+
+        except Exception as e:
+            print("Ошибка при проверке ИНН:", e)
+            return False
+
     def add_partner(self, partner_data):
-        conn = self.get_connection()
-        cursor = conn.cursor()
+        """Добавляет нового партнера с проверкой уникальности ИНН"""
+        try:
+            print("=== ДОБАВЛЕНИЕ ПАРТНЕРА ===")
+            print("Данные для добавления:", partner_data)
 
-        query = """
-        INSERT INTO Partners_Import 
-        (PartnerType, PartnerName, Director, Phone, Email, LegalAddress, INN, Rating)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """
+            # Проверяем уникальность ИНН
+            inn = partner_data['INN']
+            if self.is_inn_exists(inn):
+                print(f"⚠️ ОШИБКА: Партнер с ИНН {inn} уже существует!")
+                return False, f"Партнер с ИНН {inn} уже существует в базе данных"
 
-        values = (
-            partner_data['PartnerType'],
-            partner_data['PartnerName'],
-            partner_data['Director'],
-            partner_data['Phone'],
-            partner_data['Email'],
-            partner_data['LegalAddress'],
-            partner_data['INN'],
-            partner_data['Rating']
-        )
+            conn = self.get_connection()
+            cursor = conn.cursor()
 
-        cursor.execute(query, values)
-        conn.commit()
-        conn.close()
+            query = """
+            INSERT INTO Partners_Import 
+            (PartnerType, PartnerName, Director, Phone, Email, LegalAddress, INN, Rating)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """
 
-        return cursor.rowcount > 0
+            values = (
+                partner_data['PartnerType'],
+                partner_data['PartnerName'],
+                partner_data['Director'],
+                partner_data['Phone'],
+                partner_data['Email'],
+                partner_data['LegalAddress'],
+                partner_data['INN'],
+                partner_data['Rating']
+            )
+
+            print("SQL запрос:", query)
+            print("Значения:", values)
+
+            cursor.execute(query, values)
+
+            # Получаем ID добавленного партнера
+            partner_id = cursor.lastrowid
+            print("ID добавленного партнера:", partner_id)
+
+            conn.commit()
+            rowcount = cursor.rowcount
+
+            # Проверяем, добавился ли партнер
+            cursor.execute("SELECT * FROM Partners_Import WHERE PartnerID = ?", (partner_id,))
+            added_partner = cursor.fetchone()
+            print("Добавленный партнер:", added_partner)
+
+            conn.close()
+
+            print("=== ДОБАВЛЕНИЕ ЗАВЕРШЕНО УСПЕШНО ===")
+            return True, "Партнер успешно добавлен"
+
+        except Exception as e:
+            print("Ошибка при добавлении партнера:", e)
+            import traceback
+            traceback.print_exc()
+            return False, f"Ошибка при добавлении партнера: {str(e)}"
 
     def get_all_partners(self):
         conn = self.get_connection()

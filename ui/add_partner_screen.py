@@ -144,6 +144,7 @@ class AddPartnerScreen(QWidget):
         self.cancel_btn.clicked.connect(self.close)
 
     def save_partner(self):
+        """Сохраняет нового партнера с проверкой уникальности ИНН"""
         if not self.validate_fields():
             return
 
@@ -154,31 +155,66 @@ class AddPartnerScreen(QWidget):
                 'Director': self.director_edit.text().strip(),
                 'Phone': self.phone_edit.text().strip(),
                 'Email': self.email_edit.text().strip(),
-                'LegalAddress': self.address_edit.text().strip(),
+                'LegalAddress': self.address_edit.text().strip(),  # ИСПРАВЛЕНИЕ: используем .text() вместо .toPlainText()
                 'INN': self.inn_edit.text().strip(),
                 'Rating': self.rating_spin.value()
             }
 
-            if self.db_manager.add_partner(partner_data):
-                QMessageBox.information(self, "Успех", "Партнер успешно добавлен!")
+            print("=== СОХРАНЕНИЕ ПАРТНЕРА ===")
+            print("Данные партнера:", partner_data)
+
+            # Вызываем обновленный метод add_partner, который возвращает кортеж (success, message)
+            success, message = self.db_manager.add_partner(partner_data)
+
+            if success:
+                QMessageBox.information(self, "Успех", message)
                 self.partner_added.emit()
-                self.clear_fields()
                 self.close()
             else:
-                QMessageBox.warning(self, "Ошибка", "Не удалось добавить партнера")
+                # Показываем конкретную ошибку пользователю
+                QMessageBox.warning(self, "Ошибка", message)
+
+                # Если ошибка связана с ИНН, выделяем поле ИНН
+                if "ИНН" in message:
+                    self.inn_edit.setFocus()
+                    self.inn_edit.selectAll()
 
         except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении: {str(e)}")
+            print("Исключение при сохранении:", e)
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Непредвиденная ошибка: {str(e)}")
 
     def validate_fields(self):
+        """Валидация полей формы с проверкой ИНН"""
         if not self.partner_name_edit.text().strip():
-            QMessageBox.warning(self, "Ошибка", "Введите наименование организации")
+            QMessageBox.warning(self, "Ошибка", "Введите наименование партнера")
             self.partner_name_edit.setFocus()
             return False
 
         if not self.director_edit.text().strip():
             QMessageBox.warning(self, "Ошибка", "Введите ФИО директора")
             self.director_edit.setFocus()
+            return False
+
+        inn = self.inn_edit.text().strip()
+        if not inn:
+            QMessageBox.warning(self, "Ошибка", "Введите ИНН")
+            self.inn_edit.setFocus()
+            return False
+
+        # Проверяем формат ИНН (должен содержать только цифры и быть определенной длины)
+        if not inn.isdigit():
+            QMessageBox.warning(self, "Ошибка", "ИНН должен содержать только цифры")
+            self.inn_edit.setFocus()
+            self.inn_edit.selectAll()
+            return False
+
+        # ИНН может быть 10 или 12 цифр
+        if len(inn) not in [10, 12]:
+            QMessageBox.warning(self, "Ошибка", "ИНН должен содержать 10 или 12 цифр")
+            self.inn_edit.setFocus()
+            self.inn_edit.selectAll()
             return False
 
         if not self.phone_edit.text().strip():
@@ -191,14 +227,10 @@ class AddPartnerScreen(QWidget):
             self.email_edit.setFocus()
             return False
 
+        # ИСПРАВЛЕНИЕ: используем .text() вместо .toPlainText()
         if not self.address_edit.text().strip():
             QMessageBox.warning(self, "Ошибка", "Введите юридический адрес")
             self.address_edit.setFocus()
-            return False
-
-        if not self.inn_edit.text().strip() or len(self.inn_edit.text().strip()) != 10:
-            QMessageBox.warning(self, "Ошибка", "ИНН должен содержать 10 цифр")
-            self.inn_edit.setFocus()
             return False
 
         return True
