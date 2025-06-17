@@ -22,19 +22,16 @@ class SalesHistoryScreen(QWidget):
         layout.setSpacing(20)
         layout.setContentsMargins(30, 30, 30, 30)
 
-        # Заголовок
         title = QLabel("История продаж")
         title.setObjectName("title")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
-        # Информация о партнере
         partner_info = QLabel(f"Партнер: {self.partner_name}")
         partner_info.setObjectName("partnerInfo")
         partner_info.setAlignment(Qt.AlignCenter)
         layout.addWidget(partner_info)
 
-        # Поиск
         search_layout = QHBoxLayout()
         search_label = QLabel("Поиск по наименованию:")
         search_label.setObjectName("searchLabel")
@@ -47,10 +44,8 @@ class SalesHistoryScreen(QWidget):
         search_layout.addWidget(search_label)
         search_layout.addWidget(self.search_edit)
         search_layout.addStretch()
-
         layout.addLayout(search_layout)
 
-        # Статистика
         self.stats_frame = QFrame()
         self.stats_frame.setObjectName("statsFrame")
         stats_layout = QHBoxLayout()
@@ -71,7 +66,6 @@ class SalesHistoryScreen(QWidget):
         self.stats_frame.setLayout(stats_layout)
         layout.addWidget(self.stats_frame)
 
-        # Таблица истории продаж
         self.sales_table = QTableWidget()
         self.sales_table.setColumnCount(5)
         self.sales_table.setHorizontalHeaderLabels([
@@ -79,29 +73,21 @@ class SalesHistoryScreen(QWidget):
             "Цена за единицу", "Общая сумма"
         ])
 
-        # Настройка таблицы
         header = self.sales_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)  # Дата
-        header.setSectionResizeMode(1, QHeaderView.Stretch)  # Наименование
-        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)  # Количество
-        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)  # Цена
-        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)  # Сумма
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
 
         self.sales_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.sales_table.setAlternatingRowColors(True)
         self.sales_table.setSortingEnabled(True)
-
-        # Обработчик двойного клика для редактирования
         self.sales_table.doubleClicked.connect(self.edit_sale)
-
-        # Обработчик выбора строки для отладки
-        self.sales_table.selectionModel().selectionChanged.connect(self.on_selection_changed)
 
         layout.addWidget(self.sales_table)
 
-        # Кнопки
         buttons_layout = QHBoxLayout()
-
         self.add_btn = QPushButton("Добавить")
         self.edit_btn = QPushButton("Изменить")
         self.delete_btn = QPushButton("Удалить")
@@ -112,11 +98,6 @@ class SalesHistoryScreen(QWidget):
         self.delete_btn.setObjectName("deleteBtn")
         self.back_btn.setObjectName("backBtn")
 
-        # Теперь все кнопки активны
-        self.add_btn.setEnabled(True)
-        self.edit_btn.setEnabled(True)
-        self.delete_btn.setEnabled(True)
-
         buttons_layout.addWidget(self.add_btn)
         buttons_layout.addWidget(self.edit_btn)
         buttons_layout.addWidget(self.delete_btn)
@@ -126,64 +107,33 @@ class SalesHistoryScreen(QWidget):
         layout.addLayout(buttons_layout)
         self.setLayout(layout)
 
-        # Подключение сигналов
         self.add_btn.clicked.connect(self.add_sale)
         self.edit_btn.clicked.connect(self.edit_sale)
         self.delete_btn.clicked.connect(self.delete_sale)
         self.back_btn.clicked.connect(self.close)
 
-    def on_selection_changed(self):
-        """Обработчик изменения выбора строки для отладки"""
-        current_row = self.sales_table.currentRow()
-        sale_id = self.get_selected_sale_id()
-        print(f"=== ВЫБОР ИЗМЕНИЛСЯ ===")
-        print(f"Текущая строка: {current_row}")
-        print(f"SaleID: {sale_id}")
-
-        if current_row >= 0:
-            # Проверяем все данные в строке
-            for col in range(self.sales_table.columnCount()):
-                item = self.sales_table.item(current_row, col)
-                if item:
-                    print(f"Колонка {col}: '{item.text()}' | UserRole: {item.data(Qt.UserRole)}")
-
     def load_sales_history(self, search_text=""):
-        """Загружает историю продаж партнера"""
         try:
-            print("=== ЗАГРУЗКА ИСТОРИИ ПРОДАЖ ===")
-            print(f"Партнер: {self.partner_name} (ИНН: {self.partner_inn})")
-            print(f"Поиск: '{search_text}'")
-
             sales = self.db_manager.get_partner_sales_history(self.partner_inn, search_text)
             self.sales_table.setRowCount(len(sales))
-
             total_sum = 0
 
             for row, sale in enumerate(sales):
-                # sale содержит: (SaleDate, ProductName, Quantity, MinPartnerPrice, TotalSum, SaleID)
                 sale_date, product_name, quantity, unit_price, total_price, sale_id = sale
 
-                print(f"Обрабатываем продажу {row}: SaleID={sale_id}, Продукт={product_name}")
-
-                # Форматируем дату
                 if isinstance(sale_date, str):
-                    try:
-                        # Пробуем разные форматы даты
-                        for fmt in ['%d.%m.%Y', '%Y-%m-%d', '%d/%m/%Y']:
-                            try:
-                                date_obj = datetime.strptime(sale_date, fmt)
-                                formatted_date = date_obj.strftime('%d.%m.%Y')
-                                break
-                            except:
-                                continue
-                        else:
-                            formatted_date = sale_date
-                    except:
+                    for fmt in ['%d.%m.%Y', '%Y-%m-%d', '%d/%m/%Y']:
+                        try:
+                            date_obj = datetime.strptime(sale_date, fmt)
+                            formatted_date = date_obj.strftime('%d.%m.%Y')
+                            break
+                        except:
+                            continue
+                    else:
                         formatted_date = sale_date
                 else:
                     formatted_date = sale_date.strftime('%d.%m.%Y') if sale_date else ""
 
-                # Заполняем таблицу
                 items = [
                     QTableWidgetItem(formatted_date),
                     QTableWidgetItem(str(product_name) if product_name else ""),
@@ -192,39 +142,26 @@ class SalesHistoryScreen(QWidget):
                     QTableWidgetItem(f"{float(total_price):.2f} ₽" if total_price else "0.00 ₽")
                 ]
 
-                # Выравнивание
-                items[0].setTextAlignment(Qt.AlignCenter)  # Дата
-                items[2].setTextAlignment(Qt.AlignCenter)  # Количество
-                items[3].setTextAlignment(Qt.AlignRight)  # Цена
-                items[4].setTextAlignment(Qt.AlignRight)  # Сумма
+                items[0].setTextAlignment(Qt.AlignCenter)
+                items[2].setTextAlignment(Qt.AlignCenter)
+                items[3].setTextAlignment(Qt.AlignRight)
+                items[4].setTextAlignment(Qt.AlignRight)
 
-                # ИСПРАВЛЕНИЕ: Сохраняем SaleID в КАЖДОМ элементе строки для надежности
                 for item in items:
                     item.setData(Qt.UserRole, sale_id)
-
-                print(f"Сохранен SaleID {sale_id} в строке {row}")
 
                 for col, item in enumerate(items):
                     self.sales_table.setItem(row, col, item)
 
-                # Считаем общую сумму
                 if total_price:
                     total_sum += float(total_price)
 
-            # Обновляем статистику
             self.update_statistics()
 
-            print(f"Загружено продаж: {len(sales)}")
-            print("=== ЗАГРУЗКА ЗАВЕРШЕНА ===")
-
         except Exception as e:
-            print(f"Ошибка при загрузке истории продаж: {e}")
-            import traceback
-            traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось загрузить историю продаж: {str(e)}")
 
     def update_statistics(self):
-        """Обновляет статистику продаж"""
         try:
             stats = self.db_manager.get_sales_statistics(self.partner_inn)
 
@@ -238,38 +175,27 @@ class SalesHistoryScreen(QWidget):
                 self.total_sum_label.setText("Общая сумма: 0.00 ₽")
 
         except Exception as e:
-            print(f"Ошибка при обновлении статистики: {e}")
+            pass
 
     def on_search_changed(self):
-        """Обработчик изменения поискового запроса"""
         search_text = self.search_edit.text().strip()
         self.load_sales_history(search_text)
 
     def get_selected_sale_id(self):
-        """Получает ID выбранной продажи"""
-        print("=== ПОЛУЧЕНИЕ SELECTED SALE ID ===")
         current_row = self.sales_table.currentRow()
-        print(f"Текущая строка: {current_row}")
-
         if current_row < 0:
-            print("❌ Строка не выбрана")
             return None
 
-        # Проверяем все колонки в поисках SaleID
         for col in range(self.sales_table.columnCount()):
             item = self.sales_table.item(current_row, col)
             if item:
                 sale_id = item.data(Qt.UserRole)
-                print(f"Колонка {col}: UserRole = {sale_id}")
                 if sale_id is not None:
-                    print(f"✅ Найден SaleID: {sale_id}")
                     return sale_id
 
-        print("❌ SaleID не найден ни в одной колонке")
         return None
 
     def get_selected_sale_info(self):
-        """Получает информацию о выбранной продаже"""
         current_row = self.sales_table.currentRow()
         if current_row < 0:
             return None, None, None, None, None
@@ -288,9 +214,6 @@ class SalesHistoryScreen(QWidget):
         return sale_id, date_text, product_text, quantity_text, sum_text
 
     def edit_sale(self):
-        """Открывает окно редактирования продажи"""
-        print("=== НАЧАЛО РЕДАКТИРОВАНИЯ ПРОДАЖИ ===")
-
         sale_id, date_text, product_text, quantity_text, sum_text = self.get_selected_sale_info()
 
         if not sale_id:
@@ -300,8 +223,6 @@ class SalesHistoryScreen(QWidget):
             return
 
         try:
-            print(f"Открываем редактирование продажи ID: {sale_id}")
-
             self.edit_sale_window = EditSaleScreen(self.partner_inn, self.partner_name, sale_id)
             self.edit_sale_window.sale_updated.connect(lambda: self.load_sales_history(self.search_edit.text().strip()))
             self.edit_sale_window.setWindowTitle(f"Редактирование продажи - {product_text} от {date_text}")
@@ -309,15 +230,9 @@ class SalesHistoryScreen(QWidget):
             self.edit_sale_window.show()
 
         except Exception as e:
-            print(f"Ошибка при открытии окна редактирования продажи: {e}")
-            import traceback
-            traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось открыть окно редактирования продажи: {str(e)}")
 
     def delete_sale(self):
-        """Удаляет выбранную продажу"""
-        print("=== НАЧАЛО УДАЛЕНИЯ ПРОДАЖИ ===")
-
         sale_id, date_text, product_text, quantity_text, sum_text = self.get_selected_sale_info()
 
         if not sale_id:
@@ -341,16 +256,13 @@ class SalesHistoryScreen(QWidget):
             try:
                 if self.db_manager.delete_sale(sale_id):
                     QMessageBox.information(self, "Успех", "Продажа успешно удалена")
-                    # Перезагружаем данные
-                    search_text = self.search_edit.text().strip()
-                    self.load_sales_history(search_text)
+                    self.load_sales_history(self.search_edit.text().strip())
                 else:
                     QMessageBox.warning(self, "Ошибка", "Не удалось удалить продажу")
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка при удалении продажи: {str(e)}")
 
     def add_sale(self):
-        """Открывает окно добавления продажи"""
         try:
             self.add_sale_window = AddSaleScreen(self.partner_inn, self.partner_name)
             self.add_sale_window.sale_added.connect(lambda: self.load_sales_history(self.search_edit.text().strip()))
@@ -359,5 +271,4 @@ class SalesHistoryScreen(QWidget):
             self.add_sale_window.show()
 
         except Exception as e:
-            print(f"Ошибка при открытии окна добавления продажи: {e}")
             QMessageBox.critical(self, "Ошибка", f"Не удалось открыть окно добавления продажи: {str(e)}")

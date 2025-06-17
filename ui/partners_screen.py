@@ -9,7 +9,6 @@ from ui.partner_products_screen import PartnerProductsScreen
 from ui.sales_history_screen import SalesHistoryScreen
 
 
-
 class PartnersScreen(QWidget):
     def __init__(self):
         super().__init__()
@@ -132,51 +131,31 @@ class PartnersScreen(QWidget):
         self.edit_partner_window.show()
 
     def show_products(self):
-        """Показывает продукцию выбранного партнера"""
         inn = self.get_selected_partner_inn()
         if not inn:
             QMessageBox.warning(self, "Предупреждение", "Выберите партнера для просмотра продукции")
             return
 
         try:
-            # Получаем название партнера для отображения в заголовке
             partner_name = self.db_manager.get_partner_name_by_inn(inn)
-
-            # Импортируем и создаем окно продукции
-            from ui.partner_products_screen import PartnerProductsScreen
-
             self.products_window = PartnerProductsScreen(inn, partner_name)
             self.products_window.setWindowTitle(f"Продукция - {partner_name}")
             self.products_window.setFixedSize(1000, 700)
             self.products_window.show()
-
         except Exception as e:
             QMessageBox.critical(self, "Ошибка", f"Не удалось открыть экран продукции: {str(e)}")
-            print(f"Подробная ошибка: {e}")
 
     def show_history(self):
-        """Показывает историю продаж выбранного партнера"""
-        print("=== ПОКАЗ ИСТОРИИ ПРОДАЖ ===")
-
         inn = self.get_selected_partner_inn()
         if not inn:
             QMessageBox.warning(self, "Предупреждение", "Выберите партнера для просмотра истории продаж")
             return
 
         try:
-            # Получаем название партнера для отображения в заголовке
             partner_name = self.db_manager.get_partner_name_by_inn(inn)
-            print(f"Открываем историю продаж для: ИНН='{inn}', Название='{partner_name}'")
-
             self.history_window = SalesHistoryScreen(inn, partner_name)
             self.history_window.setWindowTitle(f"История продаж - {partner_name}")
             self.history_window.setFixedSize(1200, 800)
             self.history_window.show()
-
-            print("=== ОКНО ИСТОРИИ ПРОДАЖ ОТКРЫТО ===")
-
         except Exception as e:
-            print(f"Ошибка при открытии истории продаж: {e}")
-            import traceback
-            traceback.print_exc()
             QMessageBox.critical(self, "Ошибка", f"Не удалось открыть экран истории продаж: {str(e)}")
