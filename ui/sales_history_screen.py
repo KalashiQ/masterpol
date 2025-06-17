@@ -14,8 +14,26 @@ class SalesHistoryScreen(QWidget):
         self.partner_inn = partner_inn
         self.partner_name = partner_name
         self.db_manager = DatabaseManager()
+        self.partner_discount = 0  # Текущая скидка партнера
         self.init_ui()
         self.load_sales_history()
+
+    def calculate_partner_discount(self, total_quantity):
+        """
+        Рассчитывает скидку партнера на основе общего количества продукции
+        до 10000 – 0%
+        от 10000 – до 50000 – 5%
+        от 50000 – до 300000 – 10%
+        более 300000 – 15%
+        """
+        if total_quantity < 10000:
+            return 0
+        elif 10000 <= total_quantity < 50000:
+            return 5
+        elif 50000 <= total_quantity < 300000:
+            return 10
+        else:
+            return 15
 
     def init_ui(self):
         layout = QVBoxLayout()
@@ -53,21 +71,24 @@ class SalesHistoryScreen(QWidget):
         self.total_sales_label = QLabel("Всего продаж: 0")
         self.total_quantity_label = QLabel("Общее количество: 0")
         self.total_sum_label = QLabel("Общая сумма: 0.00 ₽")
+        self.discount_label = QLabel("Скидка партнера: 0%")
 
         self.total_sales_label.setObjectName("statsLabel")
         self.total_quantity_label.setObjectName("statsLabel")
         self.total_sum_label.setObjectName("statsLabel")
+        self.discount_label.setObjectName("statsLabel")
 
         stats_layout.addWidget(self.total_sales_label)
         stats_layout.addWidget(self.total_quantity_label)
         stats_layout.addWidget(self.total_sum_label)
+        stats_layout.addWidget(self.discount_label)
         stats_layout.addStretch()
 
         self.stats_frame.setLayout(stats_layout)
         layout.addWidget(self.stats_frame)
 
         self.sales_table = QTableWidget()
-        self.sales_table.setColumnCount(5)
+        self.sales_table.setColumnCount(5)  # Возвращаем исходное количество колонок
         self.sales_table.setHorizontalHeaderLabels([
             "Дата продажи", "Наименование продукции", "Количество",
             "Цена за единицу", "Общая сумма"
@@ -86,6 +107,30 @@ class SalesHistoryScreen(QWidget):
         self.sales_table.doubleClicked.connect(self.edit_sale)
 
         layout.addWidget(self.sales_table)
+
+        # Добавляем информацию о скидке под таблицей
+        discount_frame = QFrame()
+        discount_frame.setObjectName("discountFrame")
+        discount_frame.setFrameStyle(QFrame.StyledPanel | QFrame.Raised)
+        discount_layout = QHBoxLayout()
+
+        self.discount_info_label = QLabel("Скидка партнера: 0% (общее количество: 0 шт.)")
+        self.discount_info_label.setObjectName("discountInfoLabel")
+        self.discount_info_label.setStyleSheet("""
+            QLabel {
+                font-size: 14px;
+                font-weight: bold;
+                color: #2c3e50;
+                padding: 10px;
+                background-color: #ecf0f1;
+                border-radius: 5px;
+            }
+        """)
+
+        discount_layout.addWidget(self.discount_info_label)
+        discount_layout.addStretch()
+        discount_frame.setLayout(discount_layout)
+        layout.addWidget(discount_frame)
 
         buttons_layout = QHBoxLayout()
         self.add_btn = QPushButton("Добавить")
@@ -117,6 +162,11 @@ class SalesHistoryScreen(QWidget):
             sales = self.db_manager.get_partner_sales_history(self.partner_inn, search_text)
             self.sales_table.setRowCount(len(sales))
             total_sum = 0
+
+            # Получаем статистику для расчета скидки
+            stats = self.db_manager.get_sales_statistics(self.partner_inn)
+            total_quantity = stats['total_quantity'] if stats else 0
+            self.partner_discount = self.calculate_partner_discount(total_quantity)
 
             for row, sale in enumerate(sales):
                 sale_date, product_name, quantity, unit_price, total_price, sale_id = sale
@@ -156,6 +206,9 @@ class SalesHistoryScreen(QWidget):
                 if total_price:
                     total_sum += float(total_price)
 
+            # Обновляем информацию о скидке под таблицей
+            self.update_discount_info()
+
             self.update_statistics()
 
         except Exception as e:
@@ -166,16 +219,50 @@ class SalesHistoryScreen(QWidget):
             stats = self.db_manager.get_sales_statistics(self.partner_inn)
 
             if stats:
+                total_quantity = stats['total_quantity']
+                discount = self.calculate_partner_discount(total_quantity)
+
                 self.total_sales_label.setText(f"Всего продаж: {stats['total_sales']}")
-                self.total_quantity_label.setText(f"Общее количество: {stats['total_quantity']}")
+                self.total_quantity_label.setText(f"Общее количество: {total_quantity}")
                 self.total_sum_label.setText(f"Общая сумма: {stats['total_sum']:.2f} ₽")
+                self.discount_label.setText(f"Скидка партнера: {discount}%")
             else:
                 self.total_sales_label.setText("Всего продаж: 0")
                 self.total_quantity_label.setText("Общее количество: 0")
                 self.total_sum_label.setText("Общая сумма: 0.00 ₽")
+                self.discount_label.setText("Скидка партнера: 0%")
 
         except Exception as e:
             pass
+
+    def update_discount_info(self):
+        """Обновляет информацию о скидке под таблицей"""
+        try:
+            stats = self.db_manager.get_sales_statistics(self.partner_inn)
+
+            if stats:
+                total_quantity = stats['total_quantity']
+                discount = self.calculate_partner_discount(total_quantity)
+
+                # Определяем диапазон для текущей скидки
+                if total_quantity < 10000:
+                    range_text = "до 10 000"
+                elif 10000 <= total_quantity < 50000:
+                    range_text = "от 10 000 до 50 000"
+                elif 50000 <= total_quantity < 300000:
+                    range_text = "от 50 000 до 300 000"
+                else:
+                    range_text = "свыше 300 000"
+
+                self.discount_info_label.setText(
+                    f"Скидка партнера: {discount}% "
+                    f"(общее количество: {total_quantity:,} шт., диапазон: {range_text})"
+                )
+            else:
+                self.discount_info_label.setText("Скидка партнера: 0% (общее количество: 0 шт., диапазон: до 10 000)")
+
+        except Exception as e:
+            self.discount_info_label.setText("Скидка партнера: 0% (ошибка расчета)")
 
     def on_search_changed(self):
         search_text = self.search_edit.text().strip()

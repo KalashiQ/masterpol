@@ -7,14 +7,6 @@
     <list default="true" id="1e20080a-5c14-498d-83ca-466a88e6584f" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/database/masterpol.db" beforeDir="false" afterPath="$PROJECT_DIR$/database/masterpol.db" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/add_partner_screen.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/add_partner_screen.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/add_product_screen.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/add_product_screen.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/add_sale_screen.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/add_sale_screen.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/edit_partner_screen.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/edit_partner_screen.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/edit_product_screen.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/edit_product_screen.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/edit_sale_screen.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/edit_sale_screen.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/partner_products_screen.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/partner_products_screen.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/ui/partners_screen.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/partners_screen.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/ui/sales_history_screen.py" beforeDir="false" afterPath="$PROJECT_DIR$/ui/sales_history_screen.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
