@@ -9,10 +9,12 @@ from ui.edit_sale_screen import EditSaleScreen
 
 
 class SalesHistoryScreen(QWidget):
-    def __init__(self, partner_inn, partner_name):
+    def __init__(self, partner_inn, partner_name, user_type="user", username=""):
         super().__init__()
         self.partner_inn = partner_inn
         self.partner_name = partner_name
+        self.user_type = user_type  # "admin" или "user"
+        self.username = username
         self.db_manager = DatabaseManager()
         self.partner_discount = 0  # Текущая скидка партнера
         self.init_ui()
@@ -45,10 +47,27 @@ class SalesHistoryScreen(QWidget):
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
+        # Информация о партнере и пользователе
+        info_layout = QVBoxLayout()
         partner_info = QLabel(f"Партнер: {self.partner_name}")
         partner_info.setObjectName("partnerInfo")
         partner_info.setAlignment(Qt.AlignCenter)
-        layout.addWidget(partner_info)
+
+        user_info = QLabel(f"Пользователь: {self.username} ({self.get_access_level_text()})")
+        user_info.setObjectName("userInfo")
+        user_info.setAlignment(Qt.AlignCenter)
+        user_info.setStyleSheet("""
+            QLabel#userInfo {
+                font-size: 12px;
+                color: #666;
+                font-style: italic;
+                margin-bottom: 10px;
+            }
+        """)
+
+        info_layout.addWidget(partner_info)
+        info_layout.addWidget(user_info)
+        layout.addLayout(info_layout)
 
         search_layout = QHBoxLayout()
         search_label = QLabel("Поиск по наименованию:")
@@ -88,7 +107,7 @@ class SalesHistoryScreen(QWidget):
         layout.addWidget(self.stats_frame)
 
         self.sales_table = QTableWidget()
-        self.sales_table.setColumnCount(5)  # Возвращаем исходное количество колонок
+        self.sales_table.setColumnCount(5)
         self.sales_table.setHorizontalHeaderLabels([
             "Дата продажи", "Наименование продукции", "Количество",
             "Цена за единицу", "Общая сумма"
@@ -104,7 +123,10 @@ class SalesHistoryScreen(QWidget):
         self.sales_table.setSelectionBehavior(QTableWidget.SelectRows)
         self.sales_table.setAlternatingRowColors(True)
         self.sales_table.setSortingEnabled(True)
-        self.sales_table.doubleClicked.connect(self.edit_sale)
+
+        # Двойной клик доступен только для админов
+        if self.user_type == "admin":
+            self.sales_table.doubleClicked.connect(self.edit_sale)
 
         layout.addWidget(self.sales_table)
 
@@ -132,30 +154,60 @@ class SalesHistoryScreen(QWidget):
         discount_frame.setLayout(discount_layout)
         layout.addWidget(discount_frame)
 
-        buttons_layout = QHBoxLayout()
-        self.add_btn = QPushButton("Добавить")
-        self.edit_btn = QPushButton("Изменить")
-        self.delete_btn = QPushButton("Удалить")
-        self.back_btn = QPushButton("Назад")
+        # Если пользователь не админ, показываем информационное сообщение
+        if self.user_type != "admin":
+            info_label = QLabel("ℹ️ Режим просмотра: редактирование и удаление записей недоступно")
+            info_label.setObjectName("infoLabel")
+            info_label.setStyleSheet("""
+                QLabel#infoLabel {
+                    background-color: #e3f2fd;
+                    border: 1px solid #bbdefb;
+                    border-radius: 5px;
+                    padding: 8px;
+                    color: #1976d2;
+                    font-size: 12px;
+                    margin: 5px 0;
+                }
+            """)
+            layout.addWidget(info_label)
 
-        self.add_btn.setObjectName("addBtn")
-        self.edit_btn.setObjectName("editBtn")
-        self.delete_btn.setObjectName("deleteBtn")
+        buttons_layout = QHBoxLayout()
+
+        # Кнопки, доступные только администраторам
+        if self.user_type == "admin":
+            self.add_btn = QPushButton("Добавить")
+            self.edit_btn = QPushButton("Изменить")
+            self.delete_btn = QPushButton("Удалить")
+
+            self.add_btn.setObjectName("addBtn")
+            self.edit_btn.setObjectName("editBtn")
+            self.delete_btn.setObjectName("deleteBtn")
+
+            buttons_layout.addWidget(self.add_btn)
+            buttons_layout.addWidget(self.edit_btn)
+            buttons_layout.addWidget(self.delete_btn)
+
+            # Подключаем события для административных кнопок
+            self.add_btn.clicked.connect(self.add_sale)
+            self.edit_btn.clicked.connect(self.edit_sale)
+            self.delete_btn.clicked.connect(self.delete_sale)
+
+        # Кнопка "Назад" доступна всем
+        self.back_btn = QPushButton("Назад")
         self.back_btn.setObjectName("backBtn")
 
-        buttons_layout.addWidget(self.add_btn)
-        buttons_layout.addWidget(self.edit_btn)
-        buttons_layout.addWidget(self.delete_btn)
         buttons_layout.addStretch()
         buttons_layout.addWidget(self.back_btn)
 
         layout.addLayout(buttons_layout)
         self.setLayout(layout)
 
-        self.add_btn.clicked.connect(self.add_sale)
-        self.edit_btn.clicked.connect(self.edit_sale)
-        self.delete_btn.clicked.connect(self.delete_sale)
+        # Подключаем событие для кнопки "Назад"
         self.back_btn.clicked.connect(self.close)
+
+    def get_access_level_text(self):
+        """Возвращает текстовое описание уровня доступа"""
+        return "Администратор" if self.user_type == "admin" else "Пользователь"
 
     def load_sales_history(self, search_text=""):
         try:
@@ -208,7 +260,6 @@ class SalesHistoryScreen(QWidget):
 
             # Обновляем информацию о скидке под таблицей
             self.update_discount_info()
-
             self.update_statistics()
 
         except Exception as e:
@@ -301,6 +352,12 @@ class SalesHistoryScreen(QWidget):
         return sale_id, date_text, product_text, quantity_text, sum_text
 
     def edit_sale(self):
+        """Редактирование продажи (только для администраторов)"""
+        if self.user_type != "admin":
+            QMessageBox.warning(self, "Доступ запрещен",
+                                "У вас нет прав для выполнения этого действия")
+            return
+
         sale_id, date_text, product_text, quantity_text, sum_text = self.get_selected_sale_info()
 
         if not sale_id:
@@ -320,6 +377,12 @@ class SalesHistoryScreen(QWidget):
             QMessageBox.critical(self, "Ошибка", f"Не удалось открыть окно редактирования продажи: {str(e)}")
 
     def delete_sale(self):
+        """Удаление продажи (только для администраторов)"""
+        if self.user_type != "admin":
+            QMessageBox.warning(self, "Доступ запрещен",
+                                "У вас нет прав для выполнения этого действия")
+            return
+
         sale_id, date_text, product_text, quantity_text, sum_text = self.get_selected_sale_info()
 
         if not sale_id:
@@ -350,6 +413,12 @@ class SalesHistoryScreen(QWidget):
                 QMessageBox.critical(self, "Ошибка", f"Ошибка при удалении продажи: {str(e)}")
 
     def add_sale(self):
+        """Добавление продажи (только для администраторов)"""
+        if self.user_type != "admin":
+            QMessageBox.warning(self, "Доступ запрещен",
+                                "У вас нет прав для выполнения этого действия")
+            return
+
         try:
             self.add_sale_window = AddSaleScreen(self.partner_inn, self.partner_name)
             self.add_sale_window.sale_added.connect(lambda: self.load_sales_history(self.search_edit.text().strip()))
