@@ -741,3 +741,143 @@ class DatabaseManager:
         except Exception as e:
             print(f"Ошибка при обновлении продуктов: {e}")
             return False
+
+    def get_partner_sales_history(self, partner_inn, search_text=""):
+        """Получает историю продаж партнера с названиями продуктов"""
+        try:
+            print("=== ПОЛУЧЕНИЕ ИСТОРИИ ПРОДАЖ ===")
+            print("partner_inn:", partner_inn)
+            print("search_text:", search_text)
+
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Находим ID партнера по ИНН
+            cursor.execute("SELECT PartnerID FROM Partners_Import WHERE INN = ?", (partner_inn,))
+            partner_result = cursor.fetchone()
+
+            if not partner_result:
+                print(f"⚠️ Партнер с ИНН {partner_inn} не найден")
+                return []
+
+            partner_id = partner_result[0]
+            print("ID партнера:", partner_id)
+
+            # Запрос истории продаж с JOIN для получения названий продуктов
+            base_query = """
+            SELECT 
+                pps.SaleDate,
+                pi.ProductName,
+                pps.Quantity,
+                pi.MinPartnerPrice,
+                (pps.Quantity * CAST(REPLACE(pi.MinPartnerPrice, ',', '.') AS FLOAT)) AS TotalSum,
+                pps.SaleID
+            FROM Partner_Products_Import pps
+            JOIN Products_Import pi ON pps.ProductID = pi.ProductID
+            WHERE pps.PartnerID = ?
+            """
+
+            params = [partner_id]
+
+            # Добавляем условие поиска если задан поисковый текст
+            if search_text:
+                base_query += " AND LOWER(pi.ProductName) LIKE LOWER(?)"
+                params.append(f"%{search_text}%")
+
+            base_query += " ORDER BY pps.SaleDate DESC"
+
+            print("SQL запрос:", base_query)
+            print("Параметры:", params)
+
+            cursor.execute(base_query, params)
+            sales = cursor.fetchall()
+            conn.close()
+
+            print("Найдено продаж:", len(sales))
+            for i, sale in enumerate(sales):
+                print(f"Продажа {i}: {sale}")
+
+            return sales
+
+        except Exception as e:
+            print("Ошибка при получении истории продаж:", e)
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def delete_sale(self, sale_id):
+        """Удаляет запись о продаже"""
+        try:
+            print(f"=== УДАЛЕНИЕ ПРОДАЖИ ID: {sale_id} ===")
+
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Проверяем, существует ли продажа
+            cursor.execute("SELECT * FROM Partner_Products_Import WHERE SaleID = ?", (sale_id,))
+            sale = cursor.fetchone()
+
+            if not sale:
+                print(f"⚠️ Продажа с ID {sale_id} не найдена")
+                return False
+
+            print("Удаляемая продажа:", sale)
+
+            # Удаляем продажу
+            cursor.execute("DELETE FROM Partner_Products_Import WHERE SaleID = ?", (sale_id,))
+
+            conn.commit()
+            rowcount = cursor.rowcount
+            conn.close()
+
+            print(f"Удалено записей: {rowcount}")
+            print("=== УДАЛЕНИЕ ЗАВЕРШЕНО ===")
+
+            return rowcount > 0
+
+        except Exception as e:
+            print("Ошибка при удалении продажи:", e)
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def get_sales_statistics(self, partner_inn):
+        """Получает статистику продаж партнера"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Находим ID партнера по ИНН
+            cursor.execute("SELECT PartnerID FROM Partners_Import WHERE INN = ?", (partner_inn,))
+            partner_result = cursor.fetchone()
+
+            if not partner_result:
+                return None
+
+            partner_id = partner_result[0]
+
+            # Получаем статистику
+            cursor.execute("""
+                SELECT 
+                    COUNT(*) as total_sales,
+                    SUM(pps.Quantity) as total_quantity,
+                    SUM(pps.Quantity * CAST(REPLACE(pi.MinPartnerPrice, ',', '.') AS FLOAT)) as total_sum
+                FROM Partner_Products_Import pps
+                JOIN Products_Import pi ON pps.ProductID = pi.ProductID
+                WHERE pps.PartnerID = ?
+            """, (partner_id,))
+
+            stats = cursor.fetchone()
+            conn.close()
+
+            return {
+                'total_sales': stats[0] if stats[0] else 0,
+                'total_quantity': stats[1] if stats[1] else 0,
+                'total_sum': stats[2] if stats[2] else 0
+            }
+
+        except Exception as e:
+            print("Ошибка при получении статистики:", e)
+            return None
+
+

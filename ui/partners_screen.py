@@ -6,6 +6,7 @@ from database.db_manager import DatabaseManager
 from ui.add_partner_screen import AddPartnerScreen
 from ui.edit_partner_screen import EditPartnerScreen
 from ui.partner_products_screen import PartnerProductsScreen
+from ui.sales_history_screen import SalesHistoryScreen
 
 
 
@@ -154,4 +155,28 @@ class PartnersScreen(QWidget):
             print(f"Подробная ошибка: {e}")
 
     def show_history(self):
-        QMessageBox.information(self, "Информация", "Экран истории продаж будет реализован позже")
+        """Показывает историю продаж выбранного партнера"""
+        print("=== ПОКАЗ ИСТОРИИ ПРОДАЖ ===")
+
+        inn = self.get_selected_partner_inn()
+        if not inn:
+            QMessageBox.warning(self, "Предупреждение", "Выберите партнера для просмотра истории продаж")
+            return
+
+        try:
+            # Получаем название партнера для отображения в заголовке
+            partner_name = self.db_manager.get_partner_name_by_inn(inn)
+            print(f"Открываем историю продаж для: ИНН='{inn}', Название='{partner_name}'")
+
+            self.history_window = SalesHistoryScreen(inn, partner_name)
+            self.history_window.setWindowTitle(f"История продаж - {partner_name}")
+            self.history_window.setFixedSize(1200, 800)
+            self.history_window.show()
+
+            print("=== ОКНО ИСТОРИИ ПРОДАЖ ОТКРЫТО ===")
+
+        except Exception as e:
+            print(f"Ошибка при открытии истории продаж: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось открыть экран истории продаж: {str(e)}")
