@@ -5,6 +5,7 @@ from PyQt5.QtCore import Qt, pyqtSignal
 from database.db_manager import DatabaseManager
 from datetime import datetime
 from ui.add_sale_screen import AddSaleScreen
+from ui.edit_sale_screen import EditSaleScreen
 
 
 class SalesHistoryScreen(QWidget):
@@ -90,24 +91,31 @@ class SalesHistoryScreen(QWidget):
         self.sales_table.setAlternatingRowColors(True)
         self.sales_table.setSortingEnabled(True)
 
+        # Обработчик двойного клика для редактирования
+        self.sales_table.doubleClicked.connect(self.edit_sale)
+
+        # Обработчик выбора строки для отладки
+        self.sales_table.selectionModel().selectionChanged.connect(self.on_selection_changed)
+
         layout.addWidget(self.sales_table)
 
         # Кнопки
         buttons_layout = QHBoxLayout()
 
-        self.add_btn = QPushButton("➕ Добавить")
-        self.edit_btn = QPushButton("✏️ Изменить")
-        self.delete_btn = QPushButton("🗑️ Удалить")
-        self.back_btn = QPushButton("⬅️ Назад")
+        self.add_btn = QPushButton("Добавить")
+        self.edit_btn = QPushButton("Изменить")
+        self.delete_btn = QPushButton("Удалить")
+        self.back_btn = QPushButton("Назад")
 
         self.add_btn.setObjectName("addBtn")
         self.edit_btn.setObjectName("editBtn")
         self.delete_btn.setObjectName("deleteBtn")
         self.back_btn.setObjectName("backBtn")
 
-        # Отключаем только кнопку изменения (будет реализована позже)
-        self.add_btn.setEnabled(True)  # Включаем кнопку добавления
-        self.edit_btn.setEnabled(False)
+        # Теперь все кнопки активны
+        self.add_btn.setEnabled(True)
+        self.edit_btn.setEnabled(True)
+        self.delete_btn.setEnabled(True)
 
         buttons_layout.addWidget(self.add_btn)
         buttons_layout.addWidget(self.edit_btn)
@@ -120,8 +128,24 @@ class SalesHistoryScreen(QWidget):
 
         # Подключение сигналов
         self.add_btn.clicked.connect(self.add_sale)
+        self.edit_btn.clicked.connect(self.edit_sale)
         self.delete_btn.clicked.connect(self.delete_sale)
         self.back_btn.clicked.connect(self.close)
+
+    def on_selection_changed(self):
+        """Обработчик изменения выбора строки для отладки"""
+        current_row = self.sales_table.currentRow()
+        sale_id = self.get_selected_sale_id()
+        print(f"=== ВЫБОР ИЗМЕНИЛСЯ ===")
+        print(f"Текущая строка: {current_row}")
+        print(f"SaleID: {sale_id}")
+
+        if current_row >= 0:
+            # Проверяем все данные в строке
+            for col in range(self.sales_table.columnCount()):
+                item = self.sales_table.item(current_row, col)
+                if item:
+                    print(f"Колонка {col}: '{item.text()}' | UserRole: {item.data(Qt.UserRole)}")
 
     def load_sales_history(self, search_text=""):
         """Загружает историю продаж партнера"""
@@ -138,6 +162,8 @@ class SalesHistoryScreen(QWidget):
             for row, sale in enumerate(sales):
                 # sale содержит: (SaleDate, ProductName, Quantity, MinPartnerPrice, TotalSum, SaleID)
                 sale_date, product_name, quantity, unit_price, total_price, sale_id = sale
+
+                print(f"Обрабатываем продажу {row}: SaleID={sale_id}, Продукт={product_name}")
 
                 # Форматируем дату
                 if isinstance(sale_date, str):
@@ -172,8 +198,11 @@ class SalesHistoryScreen(QWidget):
                 items[3].setTextAlignment(Qt.AlignRight)  # Цена
                 items[4].setTextAlignment(Qt.AlignRight)  # Сумма
 
-                # Сохраняем SaleID в первом элементе для удаления
-                items[0].setData(Qt.UserRole, sale_id)
+                # ИСПРАВЛЕНИЕ: Сохраняем SaleID в КАЖДОМ элементе строки для надежности
+                for item in items:
+                    item.setData(Qt.UserRole, sale_id)
+
+                print(f"Сохранен SaleID {sale_id} в строке {row}")
 
                 for col, item in enumerate(items):
                     self.sales_table.setItem(row, col, item)
@@ -218,34 +247,93 @@ class SalesHistoryScreen(QWidget):
 
     def get_selected_sale_id(self):
         """Получает ID выбранной продажи"""
+        print("=== ПОЛУЧЕНИЕ SELECTED SALE ID ===")
         current_row = self.sales_table.currentRow()
-        if current_row >= 0:
-            date_item = self.sales_table.item(current_row, 0)
-            if date_item:
-                return date_item.data(Qt.UserRole)
+        print(f"Текущая строка: {current_row}")
+
+        if current_row < 0:
+            print("❌ Строка не выбрана")
+            return None
+
+        # Проверяем все колонки в поисках SaleID
+        for col in range(self.sales_table.columnCount()):
+            item = self.sales_table.item(current_row, col)
+            if item:
+                sale_id = item.data(Qt.UserRole)
+                print(f"Колонка {col}: UserRole = {sale_id}")
+                if sale_id is not None:
+                    print(f"✅ Найден SaleID: {sale_id}")
+                    return sale_id
+
+        print("❌ SaleID не найден ни в одной колонке")
         return None
 
-    def delete_sale(self):
-        """Удаляет выбранную продажу"""
-        sale_id = self.get_selected_sale_id()
-        if not sale_id:
-            QMessageBox.warning(self, "Предупреждение", "Выберите продажу для удаления")
-            return
-
-        # Получаем информацию о продаже для подтверждения
+    def get_selected_sale_info(self):
+        """Получает информацию о выбранной продаже"""
         current_row = self.sales_table.currentRow()
+        if current_row < 0:
+            return None, None, None, None, None
+
         date_item = self.sales_table.item(current_row, 0)
         product_item = self.sales_table.item(current_row, 1)
+        quantity_item = self.sales_table.item(current_row, 2)
+        sum_item = self.sales_table.item(current_row, 4)
 
         date_text = date_item.text() if date_item else "неизвестно"
         product_text = product_item.text() if product_item else "неизвестно"
+        quantity_text = quantity_item.text() if quantity_item else "неизвестно"
+        sum_text = sum_item.text() if sum_item else "неизвестно"
+        sale_id = self.get_selected_sale_id()
+
+        return sale_id, date_text, product_text, quantity_text, sum_text
+
+    def edit_sale(self):
+        """Открывает окно редактирования продажи"""
+        print("=== НАЧАЛО РЕДАКТИРОВАНИЯ ПРОДАЖИ ===")
+
+        sale_id, date_text, product_text, quantity_text, sum_text = self.get_selected_sale_info()
+
+        if not sale_id:
+            QMessageBox.warning(self, "Предупреждение",
+                                "Выберите продажу для редактирования.\n\n"
+                                "Убедитесь, что вы кликнули на строку в таблице.")
+            return
+
+        try:
+            print(f"Открываем редактирование продажи ID: {sale_id}")
+
+            self.edit_sale_window = EditSaleScreen(self.partner_inn, self.partner_name, sale_id)
+            self.edit_sale_window.sale_updated.connect(lambda: self.load_sales_history(self.search_edit.text().strip()))
+            self.edit_sale_window.setWindowTitle(f"Редактирование продажи - {product_text} от {date_text}")
+            self.edit_sale_window.setFixedSize(500, 450)
+            self.edit_sale_window.show()
+
+        except Exception as e:
+            print(f"Ошибка при открытии окна редактирования продажи: {e}")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка", f"Не удалось открыть окно редактирования продажи: {str(e)}")
+
+    def delete_sale(self):
+        """Удаляет выбранную продажу"""
+        print("=== НАЧАЛО УДАЛЕНИЯ ПРОДАЖИ ===")
+
+        sale_id, date_text, product_text, quantity_text, sum_text = self.get_selected_sale_info()
+
+        if not sale_id:
+            QMessageBox.warning(self, "Предупреждение",
+                                "Выберите продажу для удаления.\n\n"
+                                "Убедитесь, что вы кликнули на строку в таблице.")
+            return
 
         reply = QMessageBox.question(
             self,
             "Подтверждение удаления",
             f"Вы уверены, что хотите удалить продажу?\n\n"
             f"Дата: {date_text}\n"
-            f"Продукт: {product_text}",
+            f"Продукт: {product_text}\n"
+            f"Количество: {quantity_text}\n"
+            f"Сумма: {sum_text}",
             QMessageBox.Yes | QMessageBox.No
         )
 
@@ -264,7 +352,6 @@ class SalesHistoryScreen(QWidget):
     def add_sale(self):
         """Открывает окно добавления продажи"""
         try:
-
             self.add_sale_window = AddSaleScreen(self.partner_inn, self.partner_name)
             self.add_sale_window.sale_added.connect(lambda: self.load_sales_history(self.search_edit.text().strip()))
             self.add_sale_window.setWindowTitle(f"Добавление продажи - {self.partner_name}")
