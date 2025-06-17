@@ -763,7 +763,7 @@ class DatabaseManager:
             partner_id = partner_result[0]
             print("ID партнера:", partner_id)
 
-            # Запрос истории продаж с JOIN для получения названий продуктов
+            # ИСПРАВЛЕННЫЙ ЗАПРОС: используем ROWID для связи с Products_Import
             base_query = """
             SELECT 
                 pps.SaleDate,
@@ -773,7 +773,7 @@ class DatabaseManager:
                 (pps.Quantity * CAST(REPLACE(pi.MinPartnerPrice, ',', '.') AS FLOAT)) AS TotalSum,
                 pps.SaleID
             FROM Partner_Products_Import pps
-            JOIN Products_Import pi ON pps.ProductID = pi.ProductID
+            JOIN Products_Import pi ON pps.ProductID = pi.ROWID
             WHERE pps.PartnerID = ?
             """
 
@@ -791,11 +791,70 @@ class DatabaseManager:
 
             cursor.execute(base_query, params)
             sales = cursor.fetchall()
-            conn.close()
 
             print("Найдено продаж:", len(sales))
             for i, sale in enumerate(sales):
                 print(f"Продажа {i}: {sale}")
+
+            # Если JOIN не работает, попробуем альтернативный подход
+            if not sales:
+                print("=== JOIN НЕ ДАЕТ РЕЗУЛЬТАТОВ, ПРОБУЕМ АЛЬТЕРНАТИВНЫЙ ПОДХОД ===")
+
+                # Сначала получаем все продажи партнера
+                cursor.execute("SELECT * FROM Partner_Products_Import WHERE PartnerID = ?", (partner_id,))
+                raw_sales = cursor.fetchall()
+                print(f"Прямой запрос продаж: {len(raw_sales)}")
+                for sale in raw_sales:
+                    print(f"  Продажа: {sale}")
+
+                # Получаем продажи с ручным соединением
+                manual_query = """
+                SELECT 
+                    pps.SaleDate,
+                    pps.ProductID,
+                    pps.Quantity,
+                    pps.SaleID,
+                    pi.ProductName,
+                    pi.MinPartnerPrice
+                FROM Partner_Products_Import pps, Products_Import pi
+                WHERE pps.PartnerID = ? 
+                AND pps.ProductID = pi.ROWID
+                """
+
+                if search_text:
+                    manual_query += " AND LOWER(pi.ProductName) LIKE LOWER(?)"
+                    params = [partner_id, f"%{search_text}%"]
+                else:
+                    params = [partner_id]
+
+                manual_query += " ORDER BY pps.SaleDate DESC"
+
+                print("Альтернативный SQL запрос:", manual_query)
+                print("Параметры:", params)
+
+                cursor.execute(manual_query, params)
+                manual_sales = cursor.fetchall()
+
+                print(f"Альтернативный запрос нашел: {len(manual_sales)}")
+
+                # Преобразуем к нужному формату
+                sales = []
+                for sale in manual_sales:
+                    sale_date = sale[0]
+                    product_id = sale[1]
+                    quantity = sale[2]
+                    sale_id = sale[3]
+                    product_name = sale[4]
+                    min_price = sale[5]
+
+                    total_sum = quantity * float(str(min_price).replace(',', '.'))
+
+                    sales.append((sale_date, product_name, quantity, min_price, total_sum, sale_id))
+                    print(f"Преобразованная продажа: {sales[-1]}")
+
+            conn.close()
+            print("Итого найдено продаж:", len(sales))
+            print("=== ПОЛУЧЕНИЕ ИСТОРИИ ПРОДАЖ ЗАВЕРШЕНО ===")
 
             return sales
 
@@ -844,6 +903,7 @@ class DatabaseManager:
     def get_sales_statistics(self, partner_inn):
         """Получает статистику продаж партнера"""
         try:
+            print("=== ПОЛУЧЕНИЕ СТАТИСТИКИ ПРОДАЖ ===")
             conn = self.get_connection()
             cursor = conn.cursor()
 
@@ -852,32 +912,212 @@ class DatabaseManager:
             partner_result = cursor.fetchone()
 
             if not partner_result:
+                print(f"⚠️ Партнер с ИНН {partner_inn} не найден")
                 return None
 
             partner_id = partner_result[0]
+            print("ID партнера для статистики:", partner_id)
 
-            # Получаем статистику
-            cursor.execute("""
+            # ИСПРАВЛЕННЫЙ ЗАПРОС: используем ROWID для связи
+            query = """
+            SELECT 
+                COUNT(*) as total_sales,
+                SUM(pps.Quantity) as total_quantity,
+                SUM(pps.Quantity * CAST(REPLACE(pi.MinPartnerPrice, ',', '.') AS FLOAT)) as total_sum
+            FROM Partner_Products_Import pps
+            JOIN Products_Import pi ON pps.ProductID = pi.ROWID
+            WHERE pps.PartnerID = ?
+            """
+
+            print("SQL запрос статистики:", query)
+            cursor.execute(query, (partner_id,))
+            stats = cursor.fetchone()
+
+            print("Результат статистики:", stats)
+
+            # Если JOIN не работает, используем альтернативный подход
+            if not stats or stats[0] == 0:
+                print("=== JOIN НЕ ДАЕТ РЕЗУЛЬТАТОВ ДЛЯ СТАТИСТИКИ, ПРОБУЕМ АЛЬТЕРНАТИВНЫЙ ПОДХОД ===")
+
+                # Получаем статистику с ручным соединением
+                manual_query = """
                 SELECT 
                     COUNT(*) as total_sales,
                     SUM(pps.Quantity) as total_quantity,
                     SUM(pps.Quantity * CAST(REPLACE(pi.MinPartnerPrice, ',', '.') AS FLOAT)) as total_sum
-                FROM Partner_Products_Import pps
-                JOIN Products_Import pi ON pps.ProductID = pi.ProductID
-                WHERE pps.PartnerID = ?
-            """, (partner_id,))
+                FROM Partner_Products_Import pps, Products_Import pi
+                WHERE pps.PartnerID = ? 
+                AND pps.ProductID = pi.ROWID
+                """
 
-            stats = cursor.fetchone()
+                cursor.execute(manual_query, (partner_id,))
+                stats = cursor.fetchone()
+                print("Альтернативный результат статистики:", stats)
+
             conn.close()
 
-            return {
-                'total_sales': stats[0] if stats[0] else 0,
-                'total_quantity': stats[1] if stats[1] else 0,
-                'total_sum': stats[2] if stats[2] else 0
-            }
+            if stats:
+                result = {
+                    'total_sales': stats[0] if stats[0] else 0,
+                    'total_quantity': stats[1] if stats[1] else 0,
+                    'total_sum': stats[2] if stats[2] else 0
+                }
+                print("Итоговая статистика:", result)
+                return result
+            else:
+                return {
+                    'total_sales': 0,
+                    'total_quantity': 0,
+                    'total_sum': 0
+                }
 
         except Exception as e:
             print("Ошибка при получении статистики:", e)
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def get_partner_products_for_sale(self, partner_inn):
+        """Получает продукцию партнера для добавления в продажу"""
+        try:
+            print("=== ПОЛУЧЕНИЕ ПРОДУКЦИИ ДЛЯ ПРОДАЖИ ===")
+            print("partner_inn:", partner_inn)
+
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Находим ID партнера по ИНН
+            cursor.execute("SELECT PartnerID FROM Partners_Import WHERE INN = ?", (partner_inn,))
+            partner_result = cursor.fetchone()
+
+            if not partner_result:
+                print(f"⚠️ Партнер с ИНН {partner_inn} не найден")
+                return []
+
+            partner_id = partner_result[0]
+            print("ID партнера:", partner_id)
+
+            # ИСПРАВЛЕННЫЙ ЗАПРОС: используем ROWID для получения реального ID
+            query = """
+            SELECT 
+                ROWID as ProductID,
+                ProductName, 
+                MinPartnerPrice
+            FROM Products_Import
+            WHERE PartnerID = ?
+            ORDER BY ProductName
+            """
+
+            print("SQL запрос:", query)
+            print("Параметры:", [partner_id])
+
+            cursor.execute(query, (partner_id,))
+            raw_products = cursor.fetchall()
+
+            print("Найдено записей:", len(raw_products))
+            for i, product in enumerate(raw_products):
+                print(f"  Запись {i}: {product}")
+
+            # Преобразуем в нужный формат (ProductID, ProductName, MinPartnerPrice)
+            products = []
+            for product in raw_products:
+                if len(product) >= 3:
+                    product_id = product[0]  # ROWID
+                    product_name = product[1]  # ProductName
+                    min_price = product[2]  # MinPartnerPrice
+
+                    # ROWID всегда существует, проверяем только название и цену
+                    if product_name and min_price is not None:
+                        products.append((product_id, product_name, min_price))
+                        print(f"  ✅ Обработано: ID={product_id}, Название={product_name}, Цена={min_price}")
+                    else:
+                        print(
+                            f"  ⚠️ Пропущено - некорректные данные: ID={product_id}, Название={product_name}, Цена={min_price}")
+                else:
+                    print(f"  ⚠️ Неполная запись: {product}")
+
+            print("Итого продуктов для продажи:", len(products))
+            conn.close()
+
+            # ДОПОЛНИТЕЛЬНАЯ ПРОВЕРКА
+            print("=== ФИНАЛЬНАЯ ПРОВЕРКА ДАННЫХ ===")
+            for i, (product_id, product_name, min_price) in enumerate(products):
+                print(
+                    f"Продукт {i}: ID={product_id} (тип: {type(product_id)}), Название={product_name}, Цена={min_price}")
+
+            return products
+
+        except Exception as e:
+            print("Ошибка при получении продукции для продажи:", e)
+            import traceback
+            traceback.print_exc()
+            return []
+
+    def add_sale(self, sale_data):
+        """Добавляет новую продажу"""
+        try:
+            print("=== ДОБАВЛЕНИЕ ПРОДАЖИ ===")
+            print("Данные продажи:", sale_data)
+
+            conn = self.get_connection()
+            cursor = conn.cursor()
+
+            # Получаем текущую дату и время
+            from datetime import datetime
+            current_date = datetime.now().strftime('%d.%m.%Y')
+
+            query = """
+            INSERT INTO Partner_Products_Import 
+            (ProductID, PartnerID, Quantity, SaleDate)
+            VALUES (?, ?, ?, ?)
+            """
+
+            values = (
+                sale_data['ProductID'],
+                sale_data['PartnerID'],
+                sale_data['Quantity'],
+                current_date
+            )
+
+            print("SQL запрос:", query)
+            print("Значения:", values)
+
+            cursor.execute(query, values)
+
+            # Получаем ID добавленной продажи
+            sale_id = cursor.lastrowid
+            print("ID добавленной продажи:", sale_id)
+
+            conn.commit()
+            rowcount = cursor.rowcount
+
+            # Проверяем, добавилась ли продажа
+            cursor.execute("SELECT * FROM Partner_Products_Import WHERE SaleID = ?", (sale_id,))
+            added_sale = cursor.fetchone()
+            print("Добавленная продажа:", added_sale)
+
+            conn.close()
+
+            print("=== ДОБАВЛЕНИЕ ПРОДАЖИ ЗАВЕРШЕНО ===")
+            return rowcount > 0
+
+        except Exception as e:
+            print("Ошибка при добавлении продажи:", e)
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def get_partner_id_by_inn(self, inn):
+        """Получает ID партнера по ИНН"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT PartnerID FROM Partners_Import WHERE INN = ?", (inn,))
+            result = cursor.fetchone()
+            conn.close()
+            return result[0] if result else None
+        except Exception as e:
+            print("Ошибка при получении ID партнера:", e)
             return None
 
 

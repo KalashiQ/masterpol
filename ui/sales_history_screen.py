@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QTableWidget,
 from PyQt5.QtCore import Qt, pyqtSignal
 from database.db_manager import DatabaseManager
 from datetime import datetime
+from ui.add_sale_screen import AddSaleScreen
 
 
 class SalesHistoryScreen(QWidget):
@@ -94,18 +95,18 @@ class SalesHistoryScreen(QWidget):
         # Кнопки
         buttons_layout = QHBoxLayout()
 
-        self.add_btn = QPushButton("Добавить")
-        self.edit_btn = QPushButton("Изменить")
-        self.delete_btn = QPushButton("Удалить")
-        self.back_btn = QPushButton(" Назад")
+        self.add_btn = QPushButton("➕ Добавить")
+        self.edit_btn = QPushButton("✏️ Изменить")
+        self.delete_btn = QPushButton("🗑️ Удалить")
+        self.back_btn = QPushButton("⬅️ Назад")
 
         self.add_btn.setObjectName("addBtn")
         self.edit_btn.setObjectName("editBtn")
         self.delete_btn.setObjectName("deleteBtn")
         self.back_btn.setObjectName("backBtn")
 
-        # Отключаем кнопки добавления и изменения (будут реализованы позже)
-        self.add_btn.setEnabled(False)
+        # Отключаем только кнопку изменения (будет реализована позже)
+        self.add_btn.setEnabled(True)  # Включаем кнопку добавления
         self.edit_btn.setEnabled(False)
 
         buttons_layout.addWidget(self.add_btn)
@@ -118,6 +119,7 @@ class SalesHistoryScreen(QWidget):
         self.setLayout(layout)
 
         # Подключение сигналов
+        self.add_btn.clicked.connect(self.add_sale)
         self.delete_btn.clicked.connect(self.delete_sale)
         self.back_btn.clicked.connect(self.close)
 
@@ -258,3 +260,17 @@ class SalesHistoryScreen(QWidget):
                     QMessageBox.warning(self, "Ошибка", "Не удалось удалить продажу")
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка при удалении продажи: {str(e)}")
+
+    def add_sale(self):
+        """Открывает окно добавления продажи"""
+        try:
+
+            self.add_sale_window = AddSaleScreen(self.partner_inn, self.partner_name)
+            self.add_sale_window.sale_added.connect(lambda: self.load_sales_history(self.search_edit.text().strip()))
+            self.add_sale_window.setWindowTitle(f"Добавление продажи - {self.partner_name}")
+            self.add_sale_window.setFixedSize(500, 400)
+            self.add_sale_window.show()
+
+        except Exception as e:
+            print(f"Ошибка при открытии окна добавления продажи: {e}")
+            QMessageBox.critical(self, "Ошибка", f"Не удалось открыть окно добавления продажи: {str(e)}")
