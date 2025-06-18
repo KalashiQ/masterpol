@@ -6,7 +6,6 @@ from PyQt5.QtGui import QIcon, QPixmap
 from ui.partners_screen import PartnersScreen
 
 
-
 class MainWindow(QMainWindow):
     logout_requested = pyqtSignal()
 
@@ -77,18 +76,6 @@ class MainWindow(QMainWindow):
         partners_action = QAction('Партнеры', self)
         partners_action.triggered.connect(self.show_partners)
         nav_menu.addAction(partners_action)
-
-        products_action = QAction('Продукция', self)
-        products_action.triggered.connect(self.show_products)
-        nav_menu.addAction(products_action)
-
-        materials_action = QAction('Материалы', self)
-        materials_action.triggered.connect(self.show_materials)
-        nav_menu.addAction(materials_action)
-
-        reports_action = QAction('Отчеты', self)
-        reports_action.triggered.connect(self.show_reports)
-        nav_menu.addAction(reports_action)
 
         # Меню "Справка"
         help_menu = menubar.addMenu('Справка')
@@ -269,7 +256,7 @@ class MainWindow(QMainWindow):
         welcome_text.setObjectName("welcomeText")
         welcome_text.setAlignment(Qt.AlignCenter)
 
-        # Кнопки навигации
+        # Кнопка для перехода к партнерам
         buttons_layout = QVBoxLayout()
         buttons_layout.setAlignment(Qt.AlignCenter)
         buttons_layout.setSpacing(15)
@@ -278,22 +265,7 @@ class MainWindow(QMainWindow):
         partners_btn.setObjectName("navBtn")
         partners_btn.clicked.connect(self.show_partners)
 
-        products_btn = QPushButton("Продукция")
-        products_btn.setObjectName("navBtn")
-        products_btn.clicked.connect(self.show_products)
-
-        materials_btn = QPushButton("Материалы")
-        materials_btn.setObjectName("navBtn")
-        materials_btn.clicked.connect(self.show_materials)
-
-        reports_btn = QPushButton("Отчеты")
-        reports_btn.setObjectName("navBtn")
-        reports_btn.clicked.connect(self.show_reports)
-
         buttons_layout.addWidget(partners_btn)
-        buttons_layout.addWidget(products_btn)
-        buttons_layout.addWidget(materials_btn)
-        buttons_layout.addWidget(reports_btn)
 
         layout.addWidget(welcome_title)
         layout.addWidget(welcome_text)
@@ -316,38 +288,6 @@ class MainWindow(QMainWindow):
         self.current_screen = PartnersScreen(self.user_type, self.username)
         self.content_layout.addWidget(self.current_screen)
         self.statusBar().showMessage("Раздел: Партнеры")
-
-    def show_products(self):
-        """Показывает экран продукции"""
-        self.clear_content()
-        # Передаем информацию о пользователе, если экран поддерживает это
-        try:
-            self.current_screen = ProductsScreen(self.user_type, self.username)
-        except:
-            # Если экран не поддерживает параметры пользователя, создаем без них
-            self.current_screen = ProductsScreen()
-        self.content_layout.addWidget(self.current_screen)
-        self.statusBar().showMessage("Раздел: Продукция")
-
-    def show_materials(self):
-        """Показывает экран материалов"""
-        self.clear_content()
-        try:
-            self.current_screen = MaterialsScreen(self.user_type, self.username)
-        except:
-            self.current_screen = MaterialsScreen()
-        self.content_layout.addWidget(self.current_screen)
-        self.statusBar().showMessage("Раздел: Материалы")
-
-    def show_reports(self):
-        """Показывает экран отчетов"""
-        self.clear_content()
-        try:
-            self.current_screen = SalesReportScreen(self.user_type, self.username)
-        except:
-            self.current_screen = SalesReportScreen()
-        self.content_layout.addWidget(self.current_screen)
-        self.statusBar().showMessage("Раздел: Отчеты")
 
     def show_about(self):
         """Показывает информацию о программе"""

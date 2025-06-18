@@ -202,8 +202,74 @@ class SalesHistoryScreen(QWidget):
         layout.addLayout(buttons_layout)
         self.setLayout(layout)
 
+        # Применяем стили для кнопок
+        self.apply_button_styles()
+
         # Подключаем событие для кнопки "Назад"
         self.back_btn.clicked.connect(self.close)
+
+    def apply_button_styles(self):
+        """Применяет стили для кнопок"""
+        button_style = """
+            QPushButton {
+                background-color: #f0f0f0;
+                color: black;
+                border: 1px solid #ccc;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+
+            QPushButton:hover {
+                background-color: #e0e0e0;
+                border-color: #999;
+                color: black;
+            }
+
+            QPushButton:pressed {
+                background-color: #d0d0d0;
+                color: black;
+            }
+        """
+
+        delete_button_style = """
+            QPushButton#deleteBtn {
+                background-color: #ffebee;
+                color: black;
+                border: 1px solid #f44336;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-size: 14px;
+                font-weight: bold;
+                min-width: 80px;
+            }
+
+            QPushButton#deleteBtn:hover {
+                background-color: #ffcdd2;
+                border-color: #d32f2f;
+                color: black;
+            }
+
+            QPushButton#deleteBtn:pressed {
+                background-color: #ffb3ba;
+                color: black;
+            }
+        """
+
+        # Применяем стили ко всем кнопкам
+        all_buttons = [self.back_btn]
+
+        if self.user_type == "admin":
+            all_buttons.extend([self.add_btn, self.edit_btn])
+
+        for button in all_buttons:
+            button.setStyleSheet(button_style)
+
+        # Отдельный стиль для кнопки удаления
+        if self.user_type == "admin":
+            self.delete_btn.setStyleSheet(delete_button_style)
 
     def get_access_level_text(self):
         """Возвращает текстовое описание уровня доступа"""

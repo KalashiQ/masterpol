@@ -6,10 +6,11 @@ from database.db_manager import DatabaseManager
 
 
 class PartnerProductsScreen(QWidget):
-    def __init__(self, partner_inn, partner_name):
+    def __init__(self, partner_inn, partner_name, user_type="user"):
         super().__init__()
         self.partner_inn = partner_inn
         self.partner_name = partner_name
+        self.user_type = user_type  # Добавляем информацию о типе пользователя
         self.db_manager = DatabaseManager()
         self.search_timer = QTimer()
         self.search_timer.setSingleShot(True)
@@ -46,6 +47,23 @@ class PartnerProductsScreen(QWidget):
         partner_info = QLabel("Партнер: {} (ИНН: {})".format(self.partner_name, self.partner_inn))
         partner_info.setObjectName("partnerInfo")
         content_layout.addWidget(partner_info)
+
+        # Добавляем информацию о правах пользователя
+        if self.user_type == "user":
+            rights_info = QLabel("Права доступа: Только просмотр")
+            rights_info.setObjectName("rightsInfo")
+            rights_info.setStyleSheet("""
+                QLabel#rightsInfo {
+                    color: #d63384;
+                    background-color: #f8d7da;
+                    border: 1px solid #f5c2c7;
+                    border-radius: 4px;
+                    padding: 8px;
+                    margin: 5px 0;
+                    font-weight: bold;
+                }
+            """)
+            content_layout.addWidget(rights_info)
 
         search_layout = QHBoxLayout()
         search_label = QLabel("Поиск:")
@@ -88,6 +106,7 @@ class PartnerProductsScreen(QWidget):
 
         buttons_layout.addStretch()
 
+        # Создаем кнопки с учетом прав доступа
         self.add_btn = QPushButton("Добавить")
         self.add_btn.setObjectName("addBtn")
 
@@ -100,9 +119,18 @@ class PartnerProductsScreen(QWidget):
         self.back_btn = QPushButton("Назад")
         self.back_btn.setObjectName("backBtn")
 
-        buttons_layout.addWidget(self.add_btn)
-        buttons_layout.addWidget(self.edit_btn)
-        buttons_layout.addWidget(self.delete_btn)
+        # Настраиваем видимость и доступность кнопок в зависимости от типа пользователя
+        if self.user_type == "user":
+            # Для обычных пользователей скрываем кнопки управления
+            self.add_btn.setVisible(False)
+            self.edit_btn.setVisible(False)
+            self.delete_btn.setVisible(False)
+        else:
+            # Для администраторов показываем все кнопки
+            buttons_layout.addWidget(self.add_btn)
+            buttons_layout.addWidget(self.edit_btn)
+            buttons_layout.addWidget(self.delete_btn)
+
         buttons_layout.addWidget(self.back_btn)
 
         buttons_frame.setLayout(buttons_layout)
@@ -110,9 +138,12 @@ class PartnerProductsScreen(QWidget):
 
         self.setLayout(main_layout)
 
-        self.add_btn.clicked.connect(self.add_product)
-        self.edit_btn.clicked.connect(self.edit_product)
-        self.delete_btn.clicked.connect(self.delete_product)
+        # Подключаем события только для администраторов
+        if self.user_type == "admin":
+            self.add_btn.clicked.connect(self.add_product)
+            self.edit_btn.clicked.connect(self.edit_product)
+            self.delete_btn.clicked.connect(self.delete_product)
+
         self.back_btn.clicked.connect(self.close)
 
     def load_products(self, search_text=""):
@@ -168,6 +199,11 @@ class PartnerProductsScreen(QWidget):
         return None
 
     def add_product(self):
+        # Дополнительная проверка прав доступа
+        if self.user_type != "admin":
+            QMessageBox.warning(self, "Доступ запрещен", "У вас нет прав для добавления продукции")
+            return
+
         try:
             from ui.add_product_screen import AddProductScreen
             self.add_product_window = AddProductScreen(self.partner_inn)
@@ -179,6 +215,11 @@ class PartnerProductsScreen(QWidget):
             QMessageBox.critical(self, "Ошибка", "Не удалось открыть окно добавления: {}".format(str(e)))
 
     def edit_product(self):
+        # Дополнительная проверка прав доступа
+        if self.user_type != "admin":
+            QMessageBox.warning(self, "Доступ запрещен", "У вас нет прав для редактирования продукции")
+            return
+
         article = self.get_selected_product_article()
         if not article:
             QMessageBox.warning(self, "Предупреждение", "Выберите продукт для редактирования")
@@ -223,6 +264,11 @@ class PartnerProductsScreen(QWidget):
         return None
 
     def delete_product(self):
+        # Дополнительная проверка прав доступа
+        if self.user_type != "admin":
+            QMessageBox.warning(self, "Доступ запрещен", "У вас нет прав для удаления продукции")
+            return
+
         article = self.get_selected_product_article()
         if not article:
             QMessageBox.warning(self, "Предупреждение", "Выберите продукт для удаления")

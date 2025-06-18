@@ -7,7 +7,7 @@ Add commentMore actions
 *.so
 
 # Distribution / packaging
-.Python
+.venv/.Python
 build/
 develop-eggs/
 dist/

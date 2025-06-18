@@ -44,7 +44,7 @@ class PartnersScreen(QWidget):
                 font-size: 12px;
                 color: #666;
                 font-style: italic;
-                margin-bottom: 20px;
+                margin-bottom: 30px;
                 padding: 15px 20px;
                 background-color: #f8f9fa;
                 border: 1px solid #e9ecef;
@@ -56,6 +56,9 @@ class PartnersScreen(QWidget):
         title_layout.addWidget(access_info)
 
         layout.addLayout(title_layout)
+
+        # Добавляем дополнительный отступ после информации о пользователе
+        layout.addSpacing(20)
 
         self.partners_table = QTableWidget()
         self.partners_table.setColumnCount(8)
@@ -286,8 +289,8 @@ class PartnersScreen(QWidget):
 
         try:
             partner_name = self.db_manager.get_partner_name_by_inn(inn)
-            # Исправленный вызов конструктора - только необходимые аргументы
-            self.products_window = PartnerProductsScreen(inn, partner_name)
+            # Передаем user_type в конструктор PartnerProductsScreen
+            self.products_window = PartnerProductsScreen(inn, partner_name, self.user_type)
             self.products_window.setWindowTitle(f"Продукция - {partner_name}")
             self.products_window.setFixedSize(1000, 700)
             self.products_window.show()
@@ -303,8 +306,8 @@ class PartnersScreen(QWidget):
 
         try:
             partner_name = self.db_manager.get_partner_name_by_inn(inn)
-            # Исправленный вызов конструктора - только необходимые аргументы
-            self.history_window = SalesHistoryScreen(inn, partner_name)
+            # Передаем user_type и username в конструктор SalesHistoryScreen
+            self.history_window = SalesHistoryScreen(inn, partner_name, self.user_type, self.username)
             self.history_window.setWindowTitle(f"История продаж - {partner_name}")
             self.history_window.setFixedSize(1200, 800)
             self.history_window.show()
