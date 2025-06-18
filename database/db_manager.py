@@ -65,13 +65,19 @@ class DatabaseManager:
             conn = self.get_connection()
             cursor = conn.cursor()
 
+            # Получаем следующий доступный PartnerID
+            cursor.execute("SELECT MAX(PartnerID) FROM Partners_Import")
+            max_id_result = cursor.fetchone()
+            next_id = (max_id_result[0] + 1) if max_id_result[0] is not None else 1
+
             query = """
             INSERT INTO Partners_Import 
-            (PartnerType, PartnerName, Director, Phone, Email, LegalAddress, INN, Rating)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (PartnerID, PartnerType, PartnerName, Director, Phone, Email, LegalAddress, INN, Rating)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
 
             values = (
+                next_id,
                 partner_data['PartnerType'],
                 partner_data['PartnerName'],
                 partner_data['Director'],
@@ -83,13 +89,14 @@ class DatabaseManager:
             )
 
             cursor.execute(query, values)
-            partner_id = cursor.lastrowid
             conn.commit()
             conn.close()
 
+            print(f"Добавлен партнер с PartnerID: {next_id}, ИНН: {inn}")
             return True, "Партнер успешно добавлен"
 
         except Exception as e:
+            print(f"Ошибка при добавлении партнера: {str(e)}")
             return False, f"Ошибка при добавлении партнера: {str(e)}"
 
     def get_all_partners(self):
@@ -302,13 +309,37 @@ class DatabaseManager:
             conn = self.get_connection()
             cursor = conn.cursor()
 
+            # Проверяем, что таблица Products_Import имеет колонку PartnerID
+            cursor.execute("PRAGMA table_info(Products_Import)")
+            columns = [col[1] for col in cursor.fetchall()]
+
+            if 'PartnerID' not in columns:
+                print("Добавляем колонку PartnerID в таблицу Products_Import")
+                cursor.execute("ALTER TABLE Products_Import ADD COLUMN PartnerID INTEGER")
+                conn.commit()
+
             partner_id = None
             if partner_inn:
+                # Получаем PartnerID по ИНН
                 cursor.execute("SELECT PartnerID FROM Partners_Import WHERE INN = ?", (partner_inn,))
                 partner_result = cursor.fetchone()
                 if partner_result:
                     partner_id = partner_result[0]
+                    print(f"Найден партнер с ID: {partner_id} для ИНН: {partner_inn}")
+                else:
+                    print(f"Партнер с ИНН {partner_inn} не найден!")
+                    conn.close()
+                    return False
 
+            # Проверяем, что артикул уникален
+            cursor.execute("SELECT COUNT(*) FROM Products_Import WHERE ArticleNumber = ?",
+                           (product_data['ArticleNumber'],))
+            if cursor.fetchone()[0] > 0:
+                print(f"Продукт с артикулом {product_data['ArticleNumber']} уже существует!")
+                conn.close()
+                return False
+
+            # Добавляем продукт
             query = """
             INSERT INTO Products_Import 
             (ProductName, ProductTypeID, ArticleNumber, MinPartnerPrice, PartnerID)
@@ -329,15 +360,20 @@ class DatabaseManager:
                 partner_id
             )
 
+            print(f"Добавляем продукт: {values}")
             cursor.execute(query, values)
             product_id = cursor.lastrowid
             conn.commit()
             rowcount = cursor.rowcount
             conn.close()
 
+            print(f"Продукт добавлен с ID: {product_id}, затронуто строк: {rowcount}")
             return rowcount > 0
 
         except Exception as e:
+            print(f"Ошибка в add_product_with_partner_id: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def get_partner_products_by_partner_id(self, partner_inn, search_text=""):
@@ -346,30 +382,30 @@ class DatabaseManager:
             conn = self.get_connection()
             cursor = conn.cursor()
 
+            print(f"Ищем продукты для партнера с ИНН: {partner_inn}")
+
+            # Получаем PartnerID партнера
             cursor.execute("SELECT PartnerID FROM Partners_Import WHERE INN = ?", (partner_inn,))
             partner_result = cursor.fetchone()
 
             if not partner_result:
-                base_query = """
-                SELECT DISTINCT ProductName, ArticleNumber, ProductTypeID, MinPartnerPrice
-                FROM Products_Import
-                WHERE PartnerID IS NULL
-                """
-                params = []
-
-                if search_text:
-                    base_query += " AND LOWER(ProductName) LIKE LOWER(?)"
-                    params.append(f"%{search_text}%")
-
-                base_query += " ORDER BY ProductName"
-
-                cursor.execute(base_query, params)
-                products = cursor.fetchall()
+                print(f"Партнер с ИНН {partner_inn} не найден!")
                 conn.close()
-                return products
+                return []
 
             partner_id = partner_result[0]
+            print(f"Найден партнер с ID: {partner_id}")
 
+            # Проверяем, есть ли колонка PartnerID в таблице Products_Import
+            cursor.execute("PRAGMA table_info(Products_Import)")
+            columns = [col[1] for col in cursor.fetchall()]
+
+            if 'PartnerID' not in columns:
+                print("Колонка PartnerID не найдена в таблице Products_Import")
+                conn.close()
+                return []
+
+            # Получаем продукты партнера
             base_query = """
             SELECT DISTINCT ProductName, ArticleNumber, ProductTypeID, MinPartnerPrice
             FROM Products_Import
@@ -383,12 +419,21 @@ class DatabaseManager:
 
             base_query += " ORDER BY ProductName"
 
+            print(f"Выполняем запрос: {base_query} с параметрами: {params}")
             cursor.execute(base_query, params)
             products = cursor.fetchall()
+
+            print(f"Найдено продуктов: {len(products)}")
+            for i, product in enumerate(products):
+                print(f"Продукт {i + 1}: {product}")
+
             conn.close()
             return products
 
         except Exception as e:
+            print(f"Ошибка в get_partner_products_by_partner_id: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return []
 
     def update_product(self, original_article, product_data):

@@ -207,7 +207,14 @@ class PartnerProductsScreen(QWidget):
         try:
             from ui.add_product_screen import AddProductScreen
             self.add_product_window = AddProductScreen(self.partner_inn)
-            self.add_product_window.product_added.connect(self.load_products)
+
+            # Подключаем обновление списка продукции
+            def refresh_products():
+                # Очищаем поиск перед обновлением
+                self.search_edit.clear()
+                self.load_products()
+
+            self.add_product_window.product_added.connect(refresh_products)
             self.add_product_window.setWindowTitle("Добавление продукции")
             self.add_product_window.setFixedSize(600, 500)
             self.add_product_window.show()

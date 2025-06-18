@@ -126,15 +126,32 @@ class AddProductScreen(QWidget):
                 'MinPartnerPrice': self.price_spin.value()
             }
 
-            if self.db_manager.add_product_with_partner_id(product_data, self.partner_inn):
+            # Добавляем отладочную информацию
+            print(f"Добавляем продукт для партнера с ИНН: {self.partner_inn}")
+            print(f"Данные продукта: {product_data}")
+
+            result = self.db_manager.add_product_with_partner_id(product_data, self.partner_inn)
+            print(f"Результат добавления: {result}")
+
+            if result:
                 QMessageBox.information(self, "Успех", "Продукт успешно добавлен!")
+                # Очищаем поля после успешного добавления
+                self.clear_fields()
                 self.product_added.emit()
                 self.close()
             else:
                 QMessageBox.warning(self, "Ошибка", "Не удалось добавить продукт")
 
         except Exception as e:
+            print(f"Ошибка при сохранении: {str(e)}")
             QMessageBox.critical(self, "Ошибка", f"Ошибка при сохранении: {str(e)}")
+
+    def clear_fields(self):
+        """Очищает все поля формы"""
+        self.product_name_edit.clear()
+        self.product_type_combo.setCurrentIndex(0)
+        self.article_edit.clear()
+        self.price_spin.setValue(0.00)
 
     def validate_fields(self):
         if not self.product_name_edit.text().strip():
