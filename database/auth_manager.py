@@ -4,8 +4,18 @@ import os
 
 
 class AuthManager:
-    def __init__(self, db_path="database/masterpol.db"):
-        self.db_path = db_path
+    def __init__(self, db_path=None):
+        if db_path is None:
+            # Если путь не передан, используем стандартный путь
+            self.db_path = "database/masterpol.db"
+        else:
+            self.db_path = db_path
+
+        # Создаем директорию, если её нет
+        db_dir = os.path.dirname(self.db_path)
+        if db_dir and not os.path.exists(db_dir):
+            os.makedirs(db_dir)
+
         self.init_users_table()
         self.create_default_users()
 
@@ -38,6 +48,7 @@ class AuthManager:
 
             conn.commit()
             conn.close()
+            print("Таблица пользователей успешно создана/проверена")
             return True
 
         except Exception as e:
@@ -71,6 +82,8 @@ class AuthManager:
 
                 conn.commit()
                 print("Созданы пользователи по умолчанию")
+            else:
+                print("Пользователи уже существуют в базе данных")
 
             conn.close()
             return True
